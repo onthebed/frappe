@@ -253,6 +253,25 @@ class TestSQLiteSearchAPI(IntegrationTestCase):
 		finally:
 			frappe.set_user(original_user)
 
+	def test_search_handles_large_list_filters(self):
+		"""Test list filters compile without expanding into many placeholders."""
+		large_filter = [f"missing-{i}" for i in range(1000)]
+
+		captured = {}
+
+		def fake_sql(query, params, read_only=True):
+			captured["query"] = query
+			captured["params"] = params
+			return []
+
+		with patch.object(self.search, "raise_if_not_indexed"), patch.object(
+			self.search, "get_search_filters", return_value={"name": large_filter}
+		), patch.object(self.search, "sql", side_effect=fake_sql):
+			self.search.search("Python")
+
+		self.assertIn("json_each(?)", captured["query"])
+		self.assertLess(len(captured["params"]), 10)
+
 	def test_advanced_scoring_and_ranking(self):
 		"""Test scoring pipeline, ranking, and result ordering."""
 		self.search.build_index()
