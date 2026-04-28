@@ -81,3 +81,56 @@ context("List View", () => {
 		});
 	});
 });
+
+context("List View Check Filters", () => {
+	before(() => {
+		cy.login();
+		cy.visit("/desk/doctype");
+		return cy
+			.window()
+			.its("frappe")
+			.then((frappe) => {
+				return frappe.xcall("frappe.tests.ui_test_helpers.create_doctype", {
+					name: "Test List Check Filter",
+					fields: [
+						{
+							label: "Title",
+							fieldname: "title",
+							fieldtype: "Data",
+							in_list_view: 1,
+							reqd: 1,
+						},
+						{
+							label: "Enabled",
+							fieldname: "enabled",
+							fieldtype: "Check",
+							in_list_view: 1,
+							in_standard_filter: 1,
+						},
+					],
+				});
+			})
+			.then(() => {
+				return cy.insert_doc("Test List Check Filter", {
+					title: "Enabled Row",
+					enabled: 1,
+				});
+			})
+			.then(() => {
+				return cy.insert_doc("Test List Check Filter", {
+					title: "Disabled Row",
+					enabled: 0,
+				});
+			});
+	});
+
+	it("applies check filters with a falsey value", () => {
+		cy.window().then((win) => {
+			win.frappe.route_options = { enabled: 0 };
+			win.frappe.set_route("List", "Test List Check Filter");
+		});
+
+		cy.get(".list-row-container .list-row").should("have.length", 1);
+		cy.get(".list-row-container").should("contain", "Disabled Row");
+	});
+});

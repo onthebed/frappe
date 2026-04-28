@@ -750,7 +750,7 @@ class FilterArea {
 		const fields_dict = this.list_view.page.fields_dict;
 		if (f[2] === "=" && f[1] in fields_dict) {
 			const value = fields_dict[f[1]].get_value();
-			if (value) {
+			if (value !== undefined && value !== null && value !== "") {
 				exists = true;
 			}
 		}
@@ -1319,7 +1319,7 @@ class FilterArea {
 				}
 
 				// Only trigger refresh if field has a value
-				if (value) {
+				if (value !== undefined && value !== null && value !== "") {
 					this.debounced_refresh_list_view();
 				}
 			});
@@ -1332,7 +1332,7 @@ class FilterArea {
 		for (let key in fields_dict) {
 			let field = fields_dict[key];
 			let value = field.get_value();
-			if (value) {
+			if (value !== undefined && value !== null && value !== "") {
 				let match_type = field.df.match_type || "=";
 				let condition;
 
