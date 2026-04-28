@@ -1,6 +1,8 @@
 import os
 import sqlite3
+import tempfile
 import time
+import unittest
 from typing import ClassVar
 from unittest.mock import patch
 
@@ -39,6 +41,38 @@ class TestSQLiteSearch(SQLiteSearch):
 			return {}
 		# Simulate user-specific filtering
 		return {"owner": frappe.session.user}
+
+
+class LargePermissionFilterSearch(SQLiteSearch):
+	INDEX_SCHEMA: ClassVar = {
+		"text_fields": ["title", "content"],
+		"metadata_fields": ["doctype", "name", "owner", "modified"],
+		"tokenizer": "unicode61 remove_diacritics 2",
+	}
+
+	INDEXABLE_DOCTYPES: ClassVar = {
+		"Note": {
+			"fields": ["name", "title", "content", "owner", "modified"],
+		}
+	}
+
+	def __init__(self, db_path):
+		self.db_path = db_path
+		self.schema = self.INDEX_SCHEMA
+
+	def _get_connection(self, read_only=False):
+		conn = sqlite3.connect(self.db_path)
+		conn.row_factory = sqlite3.Row
+		return conn
+
+	def index_exists(self):
+		return True
+
+	def raise_if_not_indexed(self):
+		return None
+
+	def get_search_filters(self):
+		return {"doctype": ["Note"] * 1000}
 
 
 class TestSQLiteSearchAPI(IntegrationTestCase):
@@ -704,3 +738,35 @@ class TestSQLiteSearchAPI(IntegrationTestCase):
 
 		finally:
 			test_note.delete()
+
+
+class TestSQLiteSearchFilterLimits(unittest.TestCase):
+	def setUp(self):
+		self.tempdir = tempfile.TemporaryDirectory()
+		self.db_path = os.path.join(self.tempdir.name, "search.db")
+		conn = sqlite3.connect(self.db_path)
+		conn.execute(
+			"CREATE VIRTUAL TABLE search_fts USING fts5(doc_id UNINDEXED, title, content, doctype, name, owner, modified)"
+		)
+		conn.execute(
+			"INSERT INTO search_fts (doc_id, title, content, doctype, name, owner, modified) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			("Note:test-note", "Python search", "Python content", "Note", "test-note", "Administrator", "2026-04-29"),
+		)
+		conn.commit()
+		conn.close()
+
+	def tearDown(self):
+		self.tempdir.cleanup()
+
+	def test_large_list_permission_filters_do_not_hit_sqlite_variable_limit(self):
+		search = LargePermissionFilterSearch(self.db_path)
+
+		def limited_get_connection(instance, read_only=False):
+			conn = sqlite3.connect(instance.db_path)
+			conn.row_factory = sqlite3.Row
+			conn.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 999)
+			return conn
+
+		with patch.object(LargePermissionFilterSearch, "_get_connection", limited_get_connection):
+			results = search.search("Python")
+		self.assertGreater(len(results["results"]), 0)
