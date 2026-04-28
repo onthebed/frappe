@@ -848,7 +848,7 @@
    "options": "User Session Display"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "form_navigation_buttons",
    "fieldtype": "Check",
    "label": "Show navigation buttons"

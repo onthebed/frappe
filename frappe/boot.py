@@ -443,7 +443,10 @@ def add_layouts(bootinfo):
 def get_desk_settings():
 	from frappe.core.doctype.user.user import desk_properties
 
-	return frappe.get_value("User", frappe.session.user, desk_properties, as_dict=True)
+	desk_settings = frappe.get_value("User", frappe.session.user, desk_properties, as_dict=True)
+	if desk_settings and desk_settings.get("form_navigation_buttons") is None:
+		desk_settings["form_navigation_buttons"] = 1
+	return desk_settings
 
 
 def get_notification_settings():

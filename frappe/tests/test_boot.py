@@ -1,7 +1,21 @@
 import frappe
-from frappe.boot import get_user_pages_or_reports
+import unittest
+from frappe.boot import get_desk_settings, get_user_pages_or_reports
 from frappe.desk.doctype.note.note import _get_unseen_notes, get_unseen_notes, mark_as_seen
 from frappe.tests import IntegrationTestCase
+
+
+class TestBootSettings(unittest.TestCase):
+	def test_get_desk_settings_defaults_navigation_buttons_for_existing_users(self):
+		from types import SimpleNamespace
+		from unittest.mock import patch
+
+		with patch.object(frappe, "session", SimpleNamespace(user="test@example.com"), create=True), patch(
+			"frappe.boot.frappe.get_value", return_value={"form_navigation_buttons": None}
+		):
+			desk_settings = get_desk_settings()
+
+		self.assertEqual(desk_settings["form_navigation_buttons"], 1)
 
 
 class TestBootData(IntegrationTestCase):
