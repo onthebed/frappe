@@ -253,6 +253,26 @@ class TestSQLiteSearchAPI(IntegrationTestCase):
 		finally:
 			frappe.set_user(original_user)
 
+	def test_large_list_filters_use_a_single_sqlite_parameter(self):
+		"""Test that large list filters avoid SQLite's parameter limit."""
+		self.search.build_index()
+
+		target_note = self.test_notes[0]
+		filters = {"name": [f"missing-{i}" for i in range(1000)] + [target_note.name]}
+
+		original_get_connection = self.search._get_connection
+
+		def limited_get_connection(*args, **kwargs):
+			conn = original_get_connection(*args, **kwargs)
+			conn.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 999)
+			return conn
+
+		with patch.object(self.search, "_get_connection", side_effect=limited_get_connection):
+			results = self.search.search("Python", filters=filters)
+
+		self.assertGreater(len(results["results"]), 0)
+		self.assertEqual(results["results"][0]["name"], target_note.name)
+
 	def test_advanced_scoring_and_ranking(self):
 		"""Test scoring pipeline, ranking, and result ordering."""
 		self.search.build_index()

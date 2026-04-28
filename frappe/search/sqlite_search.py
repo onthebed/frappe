@@ -2,6 +2,7 @@
 # MIT License. See license.txt
 
 import datetime
+import json
 import inspect
 import os
 import re
@@ -826,6 +827,9 @@ class SQLiteSearch(ABC):
 					if len(values) == 1:
 						filter_conditions.append(f"{field} = ?")
 						filter_params.append(values[0])
+					elif len(values) > 999:
+						filter_conditions.append(f"{field} IN (SELECT value FROM json_each(?))")
+						filter_params.append(json.dumps(values))
 					else:
 						placeholders = ",".join(["?" for _ in values])
 						filter_conditions.append(f"{field} IN ({placeholders})")
